@@ -2,7 +2,10 @@
   <dictionary name="Atharva">
     <words>
       <w>alohomora</w>
+      <w>connectbutton</w>
+      <w>gyrosensor</w>
       <w>kronos</w>
+      <w>msensor</w>
       <w>projectcypher</w>
     </words>
   </dictionary>

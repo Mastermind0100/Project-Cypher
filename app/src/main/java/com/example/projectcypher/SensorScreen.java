@@ -2,13 +2,18 @@ package com.example.projectcypher;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.StrictMode;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
@@ -20,14 +25,18 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 public class SensorScreen extends AppCompatActivity{
 
     private SensorManager msensorManager;
     private Sensor gyrosensor;
     private SensorEventListener gyroscopeEventListener;
+    private String val;
     TextView textView;
     Button connectbutton;
+    private HandlerThread mSensorThread;
+    private Handler mSensorHandler;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -42,44 +51,44 @@ public class SensorScreen extends AppCompatActivity{
         if(gyrosensor==null){
             Toast.makeText(getApplicationContext(), "Nah bro. That didn't work", Toast.LENGTH_SHORT);
         }
-
         gyroscopeEventListener = new SensorEventListener() {
             @Override
             public void onSensorChanged(SensorEvent event) {
-                String val = String.valueOf(Math.round(event.values[0])) + "\n" +
-                        String.valueOf(Math.round(event.values[1])) + "\n" + String.valueOf(Math.round(event.values[2]));
-
+                val = (Math.round(event.values[0])) + "\n" +
+                        (Math.round(event.values[1])) + "\n" + (Math.round(event.values[2]));
                 /*
                 first value: move to face mobile upward: +ve values, downwards: -ve values
                 second value: move to face mobile towards left: +ve values, rightwards: -ve values
                 third values: rotate mobile anticlockwise: +ve, clockwise: -ve values
                 */
-
-                textView.setText(val);
-                textView.invalidate();
-                textView.requestLayout();
+                Log.d("val output", val);
             }
 
             @Override
             public void onAccuracyChanged(Sensor sensor, int accuracy) {}
         };
-
         connectbutton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 try {
                     Socket s = new Socket("192.168.1.30", 5000);
                     DataOutputStream outputStream = new DataOutputStream(s.getOutputStream());
-                    outputStream.writeUTF("Android Device Connected");
+                    outputStream.writeUTF(val);
+                    TimeUnit.SECONDS.sleep(1);
+//                    int i = 1;
+//                    while(i!=100){
+//                        outputStream.writeUTF(val);
+//                        i++;
+//                        TimeUnit.SECONDS.sleep(1);
+//                    }
                     outputStream.flush();
                     outputStream.close();
-
                     DataInputStream inputStream = new DataInputStream(s.getInputStream());
                     String string = (String)inputStream.readUTF();
                     Toast.makeText(getApplicationContext(), string, Toast.LENGTH_LONG).show();
                     s.close();
 
-                } catch (IOException e) {
+                } catch (IOException | InterruptedException e) {
                     e.printStackTrace();
                 }
             }
@@ -87,14 +96,18 @@ public class SensorScreen extends AppCompatActivity{
     }
 
     @Override
-    protected void onResume() {
-        super.onResume();
-        msensorManager.registerListener(gyroscopeEventListener, gyrosensor, SensorManager.SENSOR_DELAY_FASTEST);
+    protected void onStart() {
+        super.onStart();
+        mSensorThread = new HandlerThread("Sensor Thread", Thread.MAX_PRIORITY);
+        mSensorThread.start();
+        mSensorHandler = new Handler(mSensorThread.getLooper());
+        msensorManager.registerListener(gyroscopeEventListener, gyrosensor, SensorManager.SENSOR_DELAY_FASTEST, mSensorHandler);
     }
 
     @Override
-    protected void onPause(){
-        super.onPause();
+    protected void onStop(){
+        super.onStop();
         msensorManager.unregisterListener(gyroscopeEventListener);
+        mSensorThread.quitSafely();
     }
 }
