@@ -35,8 +35,10 @@ public class SensorScreen extends AppCompatActivity{
     private String val;
     TextView textView;
     Button connectbutton;
+    Button disconnectbutton;
     private HandlerThread mSensorThread;
     private Handler mSensorHandler;
+    private boolean connection = false;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -46,6 +48,7 @@ public class SensorScreen extends AppCompatActivity{
         StrictMode.setThreadPolicy(policy);
         textView = (TextView) findViewById(R.id.SensorData);
         connectbutton = (Button) findViewById(R.id.connectionbutton);
+        disconnectbutton = (Button) findViewById(R.id.terminationbutton);
         msensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         gyrosensor = msensorManager != null ? msensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE) : null;
         if(gyrosensor==null){
@@ -54,8 +57,8 @@ public class SensorScreen extends AppCompatActivity{
         gyroscopeEventListener = new SensorEventListener() {
             @Override
             public void onSensorChanged(SensorEvent event) {
-                val = (Math.round(event.values[0])) + "\n" +
-                        (Math.round(event.values[1])) + "\n" + (Math.round(event.values[2]));
+                val = (Math.round(event.values[0])) + "," +
+                        (Math.round(event.values[1])) + "," + (Math.round(event.values[2]));
                 /*
                 first value: move to face mobile upward: +ve values, downwards: -ve values
                 second value: move to face mobile towards left: +ve values, rightwards: -ve values
@@ -67,20 +70,25 @@ public class SensorScreen extends AppCompatActivity{
             @Override
             public void onAccuracyChanged(Sensor sensor, int accuracy) {}
         };
+
+        disconnectbutton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                connection = false;
+            }
+        });
+
         connectbutton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                connection = true;
                 try {
                     Socket s = new Socket("192.168.1.30", 5000);
                     DataOutputStream outputStream = new DataOutputStream(s.getOutputStream());
-                    outputStream.writeUTF(val);
-                    TimeUnit.SECONDS.sleep(1);
-//                    int i = 1;
-//                    while(i!=100){
-//                        outputStream.writeUTF(val);
-//                        i++;
-//                        TimeUnit.SECONDS.sleep(1);
-//                    }
+                    while(connection){
+                        outputStream.writeUTF(val);
+                        TimeUnit.SECONDS.sleep(1);
+                    }
                     outputStream.flush();
                     outputStream.close();
                     DataInputStream inputStream = new DataInputStream(s.getInputStream());
@@ -94,16 +102,17 @@ public class SensorScreen extends AppCompatActivity{
             }
         });
     }
-
     @Override
     protected void onStart() {
         super.onStart();
         mSensorThread = new HandlerThread("Sensor Thread", Thread.MAX_PRIORITY);
         mSensorThread.start();
         mSensorHandler = new Handler(mSensorThread.getLooper());
-        msensorManager.registerListener(gyroscopeEventListener, gyrosensor, SensorManager.SENSOR_DELAY_FASTEST, mSensorHandler);
+        msensorManager.registerListener(gyroscopeEventListener,
+                gyrosensor,
+                SensorManager.SENSOR_DELAY_FASTEST,
+                mSensorHandler);
     }
-
     @Override
     protected void onStop(){
         super.onStop();
